@@ -1,0 +1,329 @@
+---
+title: "CourseWork"
+output: html_document
+date: "2023-11-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Task 1
+
+### Exploratory Analysis
+
+```{r}
+obs_data <- read.csv('Kittiwake_Observation_20594616.csv')
+obs_data
+```
+```{r}
+summary(obs_data)
+
+dawn <- obs_data$dawn
+noon <- obs_data$noon
+afternoon <- obs_data$mid.afternoon
+dusk <- obs_data$dusk
+
+```
+```{r}
+print('Standard Deviation:')
+paste('Dawn: ', sd(dawn))
+paste('Noon: ', sd(noon))
+paste('Afternoon: ', sd(afternoon))
+paste('Dusk: ', sd(dusk))
+```
+
+```{r}
+boxplot(obs_data, xlab = "Time Periods", ylab = "Sightings")
+```
+```{r}
+
+# Plot histograms and overlay normal distribution curves
+hist(dawn, freq = FALSE, main = "Distribution of Dawn Observations", xlim = range(dawn))
+curve(dnorm(x, mean(dawn), sd(dawn)), col = "blue", add = TRUE)
+
+hist(noon, freq = FALSE, main = "Distribution of Noon Observations", xlim = range(noon))
+curve(dnorm(x, mean(noon), sd(noon)), col = "red", add = TRUE)
+
+hist(afternoon, freq = FALSE, main = "Distribution of Afternoon Observations", xlim = range(afternoon))
+curve(dnorm(x, mean(afternoon), sd(afternoon)), col = "green", add = TRUE)
+
+hist(dusk, freq = FALSE, main = "Distribution of Dusk Observations", xlim = range(dusk))
+curve(dnorm(x, mean(dusk), sd(dusk)), col = "purple", add = TRUE)
+
+
+```
+```{r}
+# Combine all data into a single list for easy iteration
+observation_data <- list(dawn, noon, afternoon, dusk)
+colors <- c("blue", "red", "green", "purple")
+names <- c("Dawn", "Noon", "Afternoon", "Dusk")
+
+# Create an empty plot to prepare for overlaying histograms and curves
+plot(1, type = "n", xlim = c(min(unlist(observation_data)), max(unlist(observation_data))), ylim = c(0, 0.15), 
+     main = "Comparison Distributions with Normal Curves", xlab = "Observations", ylab = "Density")
+
+# Loop through each observation data and overlay histograms with normal distribution curves
+for (i in 1:length(observation_data)) {
+  curve(dnorm(x, mean(observation_data[[i]]), sd(observation_data[[i]])), col = colors[i], add = TRUE)
+}
+
+# Add legend for better interpretation
+legend("topright", legend = names, fill = colors)
+
+```
+
+### Confidence interval
+
+```{r}
+n <- length(obs_data$dusk)
+sampmean<-mean(obs_data$dusk) # calculate the sample mean
+sampvar<-var(obs_data$dusk) # calculate the sample variance
+lower<-sampmean-qt(0.995,n-1)*sqrt(sampvar/n) # calculate the lower limit of the confidence interval from the formula
+upper<-sampmean+qt(0.995,n-1)*sqrt(sampvar/n) # calculate the upper limit of the confidence interval from the formula
+lower
+upper
+```
+
+```{r}
+dusk <- obs_data$dusk
+result <- t.test(dusk, conf.level = 0.99)
+result$conf.int
+```
+
+```{r}
+result$estimate
+```
+
+## Task 2
+
+```{r}
+hist_data <- read.csv('Kittiwake_Historical_20594616.csv')
+hist_data
+```
+```{r}
+summary(hist_data[2:7])
+```
+
+```{r}
+transposed_data <- t(hist_data[-1])
+colnames(transposed_data) <- hist_data$X
+
+library(ggplot2)
+
+sites <- rownames(transposed_data)
+plot_data <- data.frame(
+  Year = rep(hist_data$X, times = ncol(hist_data) - 1),
+  Kittiwake_Numbers = as.vector(as.matrix(hist_data[-1])),
+  Site = rep(sites, each = length(hist_data$X))
+)
+
+ggplot(plot_data, aes(x = Year, y = Kittiwake_Numbers, color = Site)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Kittiwake Numbers Over Time by Site", x = "Year", y = "Kittiwake Numbers")
+
+```
+```{r}
+# Fit a linear regression model for each site
+linear_models <- lapply(2:ncol(hist_data), function(i) lm(hist_data[, i] ~ X, data = hist_data))
+
+# Get the slopes from the linear models
+slopes <- sapply(linear_models, function(model) coef(model)[2])
+slopes
+```
+
+### Independence of the decline and Site
+
+```{r}
+observed <- as.matrix(hist_data)[,-1]
+
+yearly_count = rowSums(observed)
+site_count = colSums(observed)
+N <- sum(observed)
+
+expected <- yearly_count%*%t(site_count)/N
+
+expected
+```
+
+```{r}
+chi_test<-sum((observed-expected)^2/expected)
+chi_test
+```
+```{r}
+nrows <- length(hist_data$X)
+ncols <- length(hist_data[1,]) - 1
+deg_freedom <- (ncols - 1) * (nrows - 1)
+pvalue <- 1-pchisq(chi_test,deg_freedom)
+pvalue
+```
+```{r}
+chisq.test(observed)
+```
+### Prediction
+
+```{r}
+lm_model_site_A <- lm(Site.A ~ X, data = hist_data)
+summary(lm_model_site_A)
+```
+```{r}
+predicted_value <- predict(lm_model_site_A, newdata = data.frame(X = 2014))
+predicted_value
+```
+
+## Task 3
+
+```{r}
+meas_data <- read.csv('Kittiwake_Measurement_20594616.csv')
+meas_data
+```
+```{r}
+summary(meas_data)
+```
+### Visual Summary
+
+```{r}
+
+library(ggplot2)
+
+ggplot(meas_data, aes(x = Sub.species, y = Weight, fill = Sub.species)) +
+  geom_boxplot() +
+  labs(x = "Sub-species", y = "Weight") +
+  theme_minimal()
+
+ggplot(meas_data, aes(x = Sub.species, y = Wingspan, fill = Sub.species)) +
+  geom_boxplot() +
+  labs(x = "Sub-species", y = "Wingspan") +
+  theme_minimal()
+
+ggplot(meas_data, aes(x = Sub.species, y = Culmen, fill = Sub.species)) +
+  geom_boxplot() +
+  labs(x = "Sub-species", y = "Culmen") +
+  theme_minimal()
+```
+```{r}
+blacklegged <- subset(meas_data, Sub.species == 'Black-legged')
+redlegged <- subset(meas_data, Sub.species == 'Red-legged')
+
+summary(blacklegged[,-1])
+summary(redlegged[,-1])
+```
+
+
+### Are Wingspan and Culmen Length independent for each specie
+
+```{r}
+plot(blacklegged$Wingspan,blacklegged$Culmen,xlab="Wingspan",ylab="Culmen Length", main = "Black-Legged Kittiwakes")
+plot(redlegged$Wingspan,redlegged$Culmen,xlab="Wingspan",ylab="Culmen Length", main = "Red-Legged Kittiwakes")
+```
+```{r}
+cor.test(blacklegged$Wingspan, blacklegged$Culmen)
+```
+
+```{r}
+cor.test(redlegged$Wingspan, redlegged$Culmen)
+```
+
+### Comparison of Weights of both species
+
+```{r}
+t.test(Weight ~ Sub.species, data = meas_data)
+```
+### Difference between the 2 subspecies
+```{r}
+t.test(Weight ~ Sub.species, data = meas_data)
+t.test(Wingspan ~ Sub.species, data = meas_data)
+t.test(Culmen ~ Sub.species, data = meas_data)
+```
+
+```{r}
+overall_test <- t.test(Weight + Wingspan + Culmen ~ Sub.species, data = meas_data)
+overall_test
+```
+
+## Task 4
+
+```{r}
+loc_data <- read.csv('Kittiwake_Location_20594616.csv')
+loc_data
+```
+
+```{r}
+plot(loc_data)
+```
+
+
+## Predict the number of breeding pairs
+
+```{r}
+model1 <- lm(Breeding.pairs ~ ., data = loc_data)
+summary(model1)
+```
+```{r}
+model1 <- step(model1)
+```
+```{r}
+summary(model1)
+```
+```{r}
+hist(model1$residuals, main = "Histogram of Model Residuals", freq = FALSE)
+curve(dnorm(x, mean(model1$residuals), sd(model1$residuals)), add = TRUE)
+```
+
+
+
+```{r}
+plot(model1$fitted.values,model1$residuals,xlab="Fitted values",ylab="Residuals",main="Fitted Values Vs Residuals")
+abline(h=0,lty=2)
+```
+
+## Linear Model for log of the number of breeding pairs
+```{r}
+model2 <- lm(log(Breeding.pairs) ~ ., data = loc_data)
+summary(model2)
+```
+```{r}
+model2 <- step(model2)
+```
+```{r}
+summary(model2)
+```
+```{r}
+hist(model2$residuals, main = "Histogram of Model Residuals", freq = FALSE)
+curve(dnorm(x, mean(model2$residuals), sd(model2$residuals)), add = TRUE)
+```
+
+
+
+```{r}
+plot(model2$fitted.values,model2$residuals,xlab="Fitted values",ylab="Residuals",main="Fitted Values Vs Residuals")
+abline(h=0,lty=2)
+```
+### Most appropriate linear model
+
+```{r}
+AIC(model1)
+AIC(model2)
+```
+### Model Fit
+
+```{r}
+plot(loc_data$sandeel, loc_data$Breeding.pairs, xlab = "Sandeel", ylab = "Breeding Pairs")
+plot(loc_data$cliff.height, loc_data$Breeding.pairs, xlab = "Cliff Height", ylab = "Breeding Pairs")
+plot(loc_data$sandeel, log(loc_data$Breeding.pairs), xlab = "Sandeel", ylab = "log(Breeding Pairs)")
+plot(loc_data$cliff.height, log(loc_data$Breeding.pairs), xlab = "Cliff Height", ylab = "log(Breeding Pairs)")
+```
+
+
+### 80% confidence interval 
+coastal direction = West, sandeel concentration = 2.93, mean summer temperature = 27.7 and cliff height (log) = 3.55.
+
+```{r}
+log_prediction <- predict(model2,newdata=data.frame(Coast.direction = 'West', sandeel = 2.93, Summer.temp = 27.7, cliff.height = 3.55),interval="confidence",level=0.80)
+prediction <- exp(log_prediction)
+log_prediction
+prediction
+```
+
+
